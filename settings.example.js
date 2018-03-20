@@ -1,3 +1,4 @@
 module.exports = {
-	token: 'xoxb-something'
+	token: 'xoxb-something',
+	verificationToken: 'something'
 }
