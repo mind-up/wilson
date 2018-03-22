@@ -1,48 +1,61 @@
-const { WebClient, RTMClient} = require('@slack/client');
-const settings = require('./settings');
+const http = require('http');
+const https = require('https');
+const { RTMClient } = require('@slack/client');
 
-// An access token (from your Slack app or custom integration - xoxp, xoxb, or xoxa)
-const token = settings.token;
-const channelId = 'C9S6D2FUJ'; // test
-
-//const web = new WebClient(token);
-// See: https://api.slack.com/methods/chat.postMessage
-//web.chat.postMessage({ channel: channelId, text: 'Hello there (web)' })
-//	.then((res) => {
-//		// `res` contains information about the posted message
-//		console.log('Message sent: ', res.ts);
-//	})
-//	.catch(console.error);
-
-
-// The client is initialized and then started to get an active connection to the platform
+// Initialize using verification token from environment variables
+// const settings = require('./settings');
+const token = process.env.TOKEN;// settings.token;
+const createSlackEventAdapter = require('@slack/events-api').createSlackEventAdapter;
+const slackEvents = createSlackEventAdapter(process.env.VERIFICATION_TOKEN);
+const port = process.env.PORT || 80;
 const rtm = new RTMClient(token);
 rtm.start();
 
+// Initialize an Express application
+const express = require('express');
+const bodyParser = require('body-parser');
+const app = express();
 
-// The RTM client can send simple string messages
-rtm.sendMessage('Hello there (rtm)', channelId)
-	.then((res) => {
-		// `res` contains information about the posted message
-		console.log('Message sent: ', res.ts);
-	})
-	.catch(console.error);
+// You must use a body parser for JSON before mounting the adapter
+app.use(bodyParser.json());
 
-
-// Initialize using verification token from environment variables
-const createSlackEventAdapter = require('@slack/events-api').createSlackEventAdapter;
-const slackEvents = createSlackEventAdapter(settings.verificationToken);
-const port = process.env.PORT || 3000;
+// Mount the event handler on a route
+// NOTE: you must mount to a path that matches the Request URL that was configured earlier
+app.use('/wilson', slackEvents.expressMiddleware());
 
 // Attach listeners to events by Slack Event "type". See: https://api.slack.com/events/message.im
-slackEvents.on('message', (event) => {
-  console.log(`Received a message event: user ${event.user} in channel ${event.channel} says ${event.text}`);
+slackEvents.on('message', (event)=> {
+	console.log('message', JSON.stringify(event, null, 2));
+	let text = event.text;
+	let wilsonId = '<@U9S5FS612>';
+	if(text && text.includes(wilsonId)) {
+		try {
+			let splittedText = text.split('"');
+			console.log('splittedt', splittedText);
+			let quote = text.split('"')[1];
+			let conversationId = text.split('" in ')[1];
+			conversationId = conversationId.split('#')[1].split('|')[0];
+			console.log(quote, conversationId);
+		
+			rtm.sendMessage(quote, conversationId)
+				.then((res) => {
+					console.log('Message sent: ', res.ts);
+				})
+				.catch(console.error);
+		} catch (error) {
+			console.error(error);
+		}
+	}
+});
+
+slackEvents.on('app_mention', (event)=> {
+	console.log('app_mention : ', JSON.stringify(event, null, 2));
 });
 
 // Handle errors (see `errorCodes` export)
 slackEvents.on('error', console.error);
 
-// Start a basic HTTP server
-slackEvents.start(port).then(() => {
-  console.log(`server listening on port ${port}`);
+// Start the express application
+http.createServer(app).listen(port, () => {
+	console.log(`server listening on port ${port}`);
 });
