@@ -30,18 +30,20 @@ slackEvents.on('message', (event)=> {
 	let wilsonId = '<@U9S5FS612>';
 	if(text && text.includes(wilsonId)) {
 		try {
-			let splittedText = text.split('"');
-			console.log('splittedt', splittedText);
-			let quote = text.split('"')[1];
-			let conversationId = text.split('" in ')[1];
-			conversationId = conversationId.split('#')[1].split('|')[0];
-			console.log(quote, conversationId);
-		
-			rtm.sendMessage(quote, conversationId)
-				.then((res) => {
-					console.log('Message sent: ', res.ts);
-				})
-				.catch(console.error);
+			let splittedText = text.split(' ');
+			if(splittedText[0] === wilsonId && splittedText[1] === 'say' && splittedText[2] === 'in') {
+				let conversationId = splittedText[3].split('#')[1].split('|')[0];
+				let splitter = splittedText[3] + ' ';
+				let quote = text.split(splitter);
+				quote.shift();
+				quote = quote.join(splitter);
+				console.log(conversationId, quote);
+				rtm.sendMessage(quote, conversationId)
+					.then((res) => {
+						console.log('Message sent: ', res.ts);
+					})
+					.catch(console.error);
+			}
 		} catch (error) {
 			console.error(error);
 		}
